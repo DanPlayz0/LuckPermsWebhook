@@ -1,0 +1,4 @@
+name: LuckPermsWebhook
+version: '${project.version}'
+main: me.danplayz.luckpermswebhook.Luckpermswebhook
+depend: [LuckPerms]
