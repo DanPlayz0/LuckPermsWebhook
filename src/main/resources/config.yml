@@ -1,1 +1,3 @@
-webhook_url: "WEBHOOK_URL"
+webhook_url:
+  - "WEBHOOK_URL"
+  - "https://discord.com/api/webhooks/..."

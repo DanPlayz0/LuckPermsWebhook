@@ -7,26 +7,24 @@ import net.luckperms.api.event.node.NodeAddEvent;
 import net.luckperms.api.event.node.NodeClearEvent;
 import net.luckperms.api.event.node.NodeRemoveEvent;
 import net.luckperms.api.node.Node;
+import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class Luckpermswebhook extends JavaPlugin {
 
-    private String webhook_url;
+    private List<String> webhookUrls;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
-        webhook_url = getConfig().getString("webhook_url", "WEBHOOK_URL");
-        if (webhook_url.equalsIgnoreCase("WEBHOOK_URL") || webhook_url.isBlank() || webhook_url.equals("undefined")) {
-            getLogger().info("[LuckPermsWebhook] Webhook URL not set.");
-            getServer().getPluginManager().disablePlugin(this);
-            return;
-        }
+        if (!isWorkingConfig()) return;
         LuckPerms luckPerms = getServer().getServicesManager().load(LuckPerms.class);
         if (luckPerms != null) {
             EventBus eventBus = luckPerms.getEventBus();
@@ -38,6 +36,31 @@ public final class Luckpermswebhook extends JavaPlugin {
             throw new IllegalStateException("LuckPerms not found");
         }
         getLogger().info("LuckPermsWebhook plugin has been enabled.");
+    }
+
+    public boolean isWorkingConfig() {
+        FileConfiguration config = getConfig();
+        Object rawWebhook = config.get("webhook_url");
+        webhookUrls = new ArrayList<>();
+
+        if (rawWebhook instanceof String) {
+            webhookUrls.add((String) rawWebhook);
+        } else if (rawWebhook instanceof List) {
+            webhookUrls.addAll(config.getStringList("webhook_url"));
+        } else {
+            getLogger().warning("Invalid format for webhook_url. Must be string or list of strings.");
+            return false;
+        }
+
+        webhookUrls.removeIf((url) -> url.equals("WEBHOOK_URL") || url.equals("https://discord.com/api/webhooks/..."));
+
+        if (webhookUrls.isEmpty()) {
+            getLogger().warning("No webhook URLs found. Disabling plugin.");
+            getServer().getPluginManager().disablePlugin(this);
+            return false;
+        }
+
+        return true;
     }
 
     @Override
@@ -80,6 +103,12 @@ public final class Luckpermswebhook extends JavaPlugin {
     }
 
     private void sendToDiscord(String message) {
+        for(String webhook_url : webhookUrls) {
+            sendToDiscord(webhook_url, message);
+        }
+    }
+
+    private void sendToDiscord(String webhook_url, String message) {
         try {
             String jsonPayload = "{\"content\": \"" + message + "\"}";
             URL url = new URL(webhook_url);
